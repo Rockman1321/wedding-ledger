@@ -1,0 +1,65 @@
+[Unit]
+Description=The Wedding Ledger (combined app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=weddinghub
+Group=weddinghub
+WorkingDirectory=/opt/wedding-hub
+# Secrets (ORS_API_KEY, OLLAMA_API_KEY, RSVP_SYNC_CF_CLIENT_SECRET,
+# MS_GRAPH_CLIENT_SECRET, ASSISTANT_API_TOKEN) go in a root-only file, never
+# in an Environment= line: systemd shows those to every local user.
+EnvironmentFile=/etc/wedding-hub/secrets.env
+
+# --- Who this copy is for ---
+# Names are saved as text on guests, tasks and venues, so don't rename later
+# without updating the stored values too.
+Environment="HUB_PARTNER_1=Alex"
+Environment="HUB_PARTNER_2=Sam"
+# Optional: short names for the guest sides ("Alex's side"), the Help tab's
+# couple line, and who to ask in Help.
+# Environment="HUB_PARTNER_1_SHORT=Al"
+# Environment="HUB_COUPLE_NAMES=Alex & Sam"
+# Environment="HUB_HELP_CONTACT=your friend who runs this server"
+# Optional: the whole guest-side list, |-separated. The first two are the
+# couple's own standing sides (Wedding Party tab).
+# Environment="HUB_GUEST_SIDES=Alex's side|Sam's side|Mutual friends"
+
+# --- Where it's served ---
+# Saves from any other hostname are refused.
+Environment="APP_PUBLIC_URL=https://planning.example.com"
+# Environment="HUB_ORIGIN_HOSTS=planning.example.com,other-name.example.com"
+Environment=DEFAULT_WEDDING_DATE=2028-06-01
+
+# --- Optional: drive times (free OpenRouteService key in secrets.env) ---
+# Environment="HOME_ADDRESS=123 Main St, City, ST 12345"
+
+# --- Optional: local AI (Ollama) ---
+Environment=OLLAMA_URL=http://<ollama-host>:11434
+Environment=OLLAMA_MODEL=qwen3.5:4b
+Environment=OLLAMA_THINK=false
+# Environment=OLLAMA_TIMEOUT_SECONDS=180
+
+# --- Optional: RSVP sync and invites ---
+# Needs a separate wedding website with an Access-gated admin API, plus a
+# Cloudflare Access service token. Hidden in the app unless all are set.
+# Environment=RSVP_SYNC_URL=https://<wedding-site>/api/admin/rsvps
+# Environment=RSVP_INVITE_URL=https://<wedding-site>/api/admin/invites
+# Environment=RSVP_INVITE_SEND_URL=https://<wedding-site>/api/admin/invites/send
+# Environment=RSVP_SYNC_CF_CLIENT_ID=<cloudflare-access-service-token-client-id>
+
+# --- Optional: vendor email sync (Microsoft 365 shared mailbox) ---
+# Hidden in the app unless all four are set (secret in secrets.env).
+# Environment=MS_GRAPH_TENANT_ID=<tenant-id>
+# Environment=MS_GRAPH_CLIENT_ID=<app-client-id>
+# Environment=SHARED_MAILBOX_ADDRESS=wedding@example.com
+# Environment=HUB_OWN_EMAIL_ADDRESSES=you@example.com
+
+ExecStart=/opt/wedding-hub/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8422
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
