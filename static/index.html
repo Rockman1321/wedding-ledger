@@ -2910,7 +2910,7 @@
   populateSelect($('gstRsvpFilter'), GUEST_RSVP_OPTIONS, true);
 
 
-  function blankMember() { return { id: null, name: '', isChild: false, mealPreference: '', dietaryNotes: '', weddingRole: '', weddingSide: '' }; }
+  function blankMember() { return { id: null, name: '', isChild: false, mealPreference: '', dietaryNotes: '', weddingRole: '', weddingSide: '', email: '' }; }
 
   function memberRowHtml(m, idx) {
     return '<div class="wa-row gst-member-row" data-idx="' + idx + '" style="margin-bottom:8px;">' +
@@ -2919,6 +2919,7 @@
         '<input type="checkbox" class="gst-member-child" data-idx="' + idx + '" style="width:auto;"' + (m.isChild ? ' checked' : '') + '>' +
         '<label style="margin:0;">Child</label>' +
       '</div>' +
+      '<div class="wa-field"><label>Email</label><input type="email" class="gst-member-email" data-idx="' + idx + '" placeholder="name@example.com" value="' + escapeHtml(m.email) + '"></div>' +
       '<div class="wa-field"><label>Meal preference</label><input type="text" class="gst-member-meal" data-idx="' + idx + '" placeholder="e.g. Chicken" value="' + escapeHtml(m.mealPreference) + '"></div>' +
       '<div class="wa-field"><label>Dietary notes</label><input type="text" class="gst-member-dietary" data-idx="' + idx + '" placeholder="Allergies, etc." value="' + escapeHtml(m.dietaryNotes) + '"></div>' +
       '<div class="wa-field"><label>Wedding party role</label>' + memberRoleHtml(m, idx) + '</div>' +
@@ -2949,6 +2950,7 @@
     var idx = Number(e.target.dataset.idx);
     if (isNaN(idx) || !editingMembers[idx]) return;
     if (e.target.classList.contains('gst-member-name')) editingMembers[idx].name = e.target.value;
+    if (e.target.classList.contains('gst-member-email')) editingMembers[idx].email = e.target.value;
     if (e.target.classList.contains('gst-member-meal')) editingMembers[idx].mealPreference = e.target.value;
     if (e.target.classList.contains('gst-member-dietary')) editingMembers[idx].dietaryNotes = e.target.value;
     if (e.target.classList.contains('gst-member-role')) editingMembers[idx].weddingRole = e.target.value;
@@ -3006,7 +3008,7 @@
     $('gstFieldAddress').value = g.address || '';
     $('gstFieldNotes').value = g.notes || '';
     editingMembers = (g.members && g.members.length) ? g.members.map(function (m) {
-      return { id: m.id || null, name: m.name || '', isChild: !!m.isChild, mealPreference: m.mealPreference || '', dietaryNotes: m.dietaryNotes || '', weddingRole: m.weddingRole || '', weddingSide: m.weddingSide || '' };
+      return { id: m.id || null, name: m.name || '', isChild: !!m.isChild, mealPreference: m.mealPreference || '', dietaryNotes: m.dietaryNotes || '', weddingRole: m.weddingRole || '', weddingSide: m.weddingSide || '', email: m.email || '' };
     }) : [blankMember()];
     renderMemberRows();
     $('gstFormTitle').textContent = 'Edit party';
@@ -3020,7 +3022,7 @@
   $('gstSaveBtn').addEventListener('click', function () {
     $('gstFormError').textContent = '';
     var members = editingMembers
-      .map(function (m) { return { id: m.id || null, name: m.name.trim(), isChild: m.isChild, mealPreference: m.mealPreference.trim(), dietaryNotes: m.dietaryNotes.trim(), weddingRole: m.weddingRole.trim(), weddingSide: m.weddingSide }; })
+      .map(function (m) { return { id: m.id || null, name: m.name.trim(), isChild: m.isChild, mealPreference: m.mealPreference.trim(), dietaryNotes: m.dietaryNotes.trim(), weddingRole: m.weddingRole.trim(), weddingSide: m.weddingSide, email: m.email.trim() }; })
       .filter(function (m) { return m.name; });
     if (members.length === 0) { $('gstFormError').textContent = 'Add at least one person to this party.'; return; }
     var name = $('gstFieldName').value.trim() || members[0].name;
@@ -3144,7 +3146,7 @@
   function weddingPartyRowHtml(p) {
     var g = p.guest, m = p.member;
     var tier = GUEST_RSVP_TIER[g.rsvpStatus] || 'neutral';
-    var contact = [g.email, g.phone].filter(Boolean).map(escapeHtml).join(' &middot; ');
+    var contact = [m.email || g.email, g.phone].filter(Boolean).map(escapeHtml).join(' &middot; ');
     return '<div class="wa-task-row">' +
       '<div class="wa-task-main">' +
         '<div class="wa-task-title">' + escapeHtml(m.name) + '</div>' +

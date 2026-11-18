@@ -520,6 +520,8 @@ def init_db():
         conn.execute("ALTER TABLE guest_members ADD COLUMN wedding_role TEXT")
     if "wedding_side" not in existing_member_cols:
         conn.execute("ALTER TABLE guest_members ADD COLUMN wedding_side TEXT")
+    if "email" not in existing_member_cols:
+        conn.execute("ALTER TABLE guest_members ADD COLUMN email TEXT")
 
     # Migrate venues tables created before tier/travel columns existed.
     existing_cols = [row[1] for row in conn.execute("PRAGMA table_info(venues)").fetchall()]
@@ -3584,6 +3586,7 @@ class GuestMember(BaseModel):
     dietaryNotes: str = ""
     weddingRole: str = ""
     weddingSide: str = ""
+    email: str = ""
 
 
 class Guest(BaseModel):
@@ -3613,6 +3616,7 @@ def guest_member_row_to_dict(row: sqlite3.Row) -> dict:
         "dietaryNotes": row["dietary_notes"] or "",
         "weddingRole": row["wedding_role"] or "",
         "weddingSide": row["wedding_side"] or "",
+        "email": row["email"] or "",
     }
 
 
@@ -3648,16 +3652,16 @@ def replace_guest_members(conn: sqlite3.Connection, guest_id: str, members: List
         if m.id and m.id in existing_ids:
             conn.execute(
                 "UPDATE guest_members SET name=?, is_child=?, meal_preference=?, dietary_notes=?, "
-                "wedding_role=?, wedding_side=? WHERE id=?",
-                (m.name, int(m.isChild), m.mealPreference, m.dietaryNotes, m.weddingRole, m.weddingSide, m.id),
+                "wedding_role=?, wedding_side=?, email=? WHERE id=?",
+                (m.name, int(m.isChild), m.mealPreference, m.dietaryNotes, m.weddingRole, m.weddingSide, m.email, m.id),
             )
             kept_ids.add(m.id)
         else:
             new_id = str(uuid.uuid4())
             conn.execute(
                 "INSERT INTO guest_members (id, guest_id, name, is_child, meal_preference, dietary_notes, "
-                "wedding_role, wedding_side) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (new_id, guest_id, m.name, int(m.isChild), m.mealPreference, m.dietaryNotes, m.weddingRole, m.weddingSide),
+                "wedding_role, wedding_side, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (new_id, guest_id, m.name, int(m.isChild), m.mealPreference, m.dietaryNotes, m.weddingRole, m.weddingSide, m.email),
             )
             kept_ids.add(new_id)
     for removed_id in existing_ids - kept_ids:
@@ -3769,7 +3773,7 @@ def export_guests():
     writer = csv.writer(buf)
     writer.writerow([
         "Party", "Side", "RSVP Status", "Member Name", "Child?",
-        "Meal Preference", "Dietary Notes", "Wedding Party Role", "Wedding Party Side",
+        "Meal Preference", "Dietary Notes", "Wedding Party Role", "Wedding Party Side", "Member Email",
         "Email", "Phone", "Address",
         "Invite Link", "QR Code", "Party Notes",
     ])
@@ -3782,12 +3786,12 @@ def export_guests():
         qr_link = f"{APP_PUBLIC_URL}/api/guests/{g['id']}/invite-qr" if g["invite_token"] else ""
         tail = [g["email"] or "", g["phone"] or "", g["address"] or "", invite_link, qr_link, g["notes"] or ""]
         if not members:
-            writer.writerow(common + ["", "", "", "", "", ""] + tail)
+            writer.writerow(common + ["", "", "", "", "", "", ""] + tail)
         for m in members:
             writer.writerow(
                 common
                 + [m["name"], "Yes" if m["is_child"] else "No", m["meal_preference"] or "", m["dietary_notes"] or "",
-                   m["wedding_role"] or "", m["wedding_side"] or ""]
+                   m["wedding_role"] or "", m["wedding_side"] or "", m["email"] or ""]
                 + tail
             )
 
