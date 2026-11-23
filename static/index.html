@@ -233,6 +233,22 @@
   .bud-line-main { flex: 1; min-width: 200px; }
   .bud-line-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .bud-warning { font-size: 0.8125rem; font-style: italic; color: var(--accent-b); margin: 4px 0; }
+  .pr-table { border-collapse: collapse; width: 100%; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .pr-table th { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); font-weight: 400; text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--accent-border); white-space: nowrap; }
+  .pr-table td { padding: 4px 6px; border-bottom: 1px solid rgba(139,170,184,0.08); vertical-align: middle; }
+  .pr-table .num { text-align: right; white-space: nowrap; }
+  .pr-table tr.pr-best td { color: var(--gold); }
+  .pr-table tr.pr-vendor-start td { border-top: 1px solid var(--accent-border); }
+  .pr-table input, .pr-table select, .pr-count select, .pr-count input { font-family: 'EB Garamond', serif; font-size: 0.875rem; border: 1px solid var(--accent-border); border-radius: 2px; padding: 4px 6px; background: rgba(232,226,217,0.04); color: var(--text-primary); width: 100%; min-width: 0; }
+  .pr-table input[type="checkbox"] { width: auto; }
+  .pr-table input.pr-num { width: 5.5em; text-align: right; }
+  .pr-count { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 6px 0 12px; font-size: 0.875rem; color: var(--text-secondary); }
+  .pr-count select { width: auto; }
+  .pr-count input { width: 5em; }
+  .pr-vendor { margin-top: 18px; }
+  .pr-vendor-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .pr-vendor-name { font-family: 'Cinzel Decorative', serif; font-size: 1rem; font-weight: 400; margin: 0; }
+  .pr-quote { font-style: italic; color: var(--text-dim); font-size: 0.8125rem; }
   .bud-ledger-buttons { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0; }
   .wp-sides { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
   .wa-phase-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -753,6 +769,7 @@
     </div>
 
     <div class="wa-card" id="waComparePanel" hidden></div>
+    <div class="wa-card" id="waPricePanel" hidden></div>
 
     <div class="wa-controls">
       <button class="btn-primary" id="waAddVendorToggle" type="button">+ Add vendor</button>
@@ -760,6 +777,8 @@
       <span class="help-tip">?<span class="help-tip-bubble">Checks the shared mailbox now; the server also does this every 15 minutes by itself. Pulls recent messages and matches them to vendors by email address. For matches, the local AI model suggests a status update and/or a proposed appointment, shown in that vendor's Details for you to accept or dismiss. Nothing changes automatically. Safe to click anytime; can take a little while if there's a lot of new mail.</span></span>
       <button class="btn-ghost" id="waCompareBtn" type="button">Compare sites</button>
       <span class="help-tip">?<span class="help-tip-bubble">Reads each vendor's own website in the background and lays out packages, prices and details side by side, for the category picked here (photographers by default). Each vendor takes a few minutes. Nothing is saved to a vendor until you choose to.</span></span>
+      <button class="btn-ghost" id="waPriceBtn" type="button">Price sheets</button>
+      <span class="help-tip">?<span class="help-tip-bubble">A spreadsheet of each vendor's prices for the category picked here (caterers by default), totalled at your guest count. Upload a menu or pricing PDF and your local AI lists its prices for you to check and add, or type them in. Group prices by option (Plated, Family style, Buffet, or a package name) and leave the option blank for anything that applies to every option, like a service charge. Untick a line to leave it out of the totals, for example when a menu offers a choice of entrées.</span></span>
       <div class="wa-control-group">
         <label for="waCategoryFilter">Category</label>
         <select id="waCategoryFilter"><option value="all">All categories</option></select>
@@ -1080,6 +1099,7 @@
       <h2 class="help-section-title">Vendors</h2>
       <p class="help-body">Same idea as Venues, for caterers, photographers, florists, and other vendors. Paste a link to auto-fill, or enter by hand. Each vendor also has a contact log for jotting down when you reached out and what was said, handy once you're juggling several conversations.</p>
       <p class="help-body"><strong>Site review</strong> reads a vendor's own website for you. Use <strong>Review site</strong> in a vendor's Details, or <strong>Compare sites</strong> to review a whole category and see packages, prices and details side by side. It reads up to 8 pages per site, slowly and politely, so allow a few minutes per vendor. Prices come from a plain text search, so they're shown with the words around them. Check what they're for, because a site's lowest price may not be a wedding price. If a site has price lists for different years, each is labeled and the comparison leads with your wedding year. Everything the AI adds has to match the page word for word, and anything not on the site shows as "Not listed", which makes a handy list of questions to ask. Some sites refuse automated reading; for those, copy the page text from your browser and use <strong>Paste page text</strong>. Nothing is saved to the vendor until you press Save.</p>
+      <p class="help-body"><strong>Price sheets</strong> lays a category's prices out like a spreadsheet (caterers unless you've picked another category). Each line is one price: per person, per child, each or per hour, a flat fee, or a percentage charge. Put lines under an option like Plated, Family style, Buffet or a package name, and every option gets its own total. A line with no option counts toward every option, so that's where a bartender, cake cutting fee or service charge goes. Totals follow your guest list live: everyone who hasn't declined, attending only, everyone, or a custom number to try out "what if we had 150?". Once an option has a child's price, "per person" counts adults only. A per-person line's "min." is the vendor's minimum guest count, and you're charged for at least that many. Service charges are a percentage of the subtotal, and anything named tax is charged on the subtotal plus service charges. Untick a line to leave it out, for example when a menu lists a choice of entrées. <strong>Upload menu or pricing</strong> takes a PDF or photo. Your local AI lists the prices it finds, keeps only prices that are actually printed in the file, and waits for you to tick what to add. Menus designed as images may not have readable text; type those in.</p>
       <p class="help-body">If a vendor has a physical shop you might visit (a florist, a bakery, a bridal shop), fill in <strong>Address</strong> and <strong>Hours</strong> so you know when they're open. If someone from a vendor is staying for the reception and needs a seat, usually a photographer, videographer, DJ/band, or officiant, check <strong>"Needs a seat at the reception"</strong> on their form. That's what makes them show up on the Seating tab. It's checked by default for those categories, but you can change it per vendor.</p>
       <p class="help-body" data-feature="emailSync"><strong>Sync vendor emails</strong> (also on the Venues tab as "Sync venue emails" — either button runs the same check) runs by itself every 15 minutes, and the button checks right away. It reads recent messages from the shared mailbox and matches them to vendors and venues by email address, Reply-To, or exact sender display name (see Venues above for what that last one is for — same platforms, same fix, no separate setup for Vendors). It also keeps a thread together and notices a vendor's or venue's name in the subject or body. Real-looking mail from anyone else appears on the Dashboard under "Emails to place," where you pick who it belongs to; newsletters and login codes are skipped. When it finds a match, the local AI model suggests a status update and/or a proposed appointment, shown under that card's Details as "Recent email activity." Nothing changes on its own — accept a suggestion to actually apply it, or dismiss it. Read-only against the mailbox: this never sends anything.</p>
       <p class="help-body">Each vendor and venue card also shows a second badge next to its status — <strong>"Waiting on vendor,"</strong> <strong>"Needs your response,"</strong> or <strong>"In progress."</strong> This is separate from Status (which tracks the overall funnel — booked, declined, etc.) and answers "whose turn is it right now." It updates itself from synced email automatically (whoever sent the last message, that's who the other side is waiting on), and you can also set it by hand when logging a phone/in-person contact — whichever happened more recently wins, so there's nothing to keep in sync manually.</p>
@@ -2670,6 +2690,383 @@
     Promise.all(list.map(function (v) { return siteStart(v.id); })).then(function () { renderVendors(); renderComparePanel(); });
   });
 
+  // ==================== Price sheets ====================
+  // Each vendor's menu or package prices as editable lines, totalled live at
+  // the guest count. Lines save as you edit; all the arithmetic happens here,
+  // so changing the guest count or ticking a line updates the totals at once.
+  var priceLines = [];
+  var PRICE_BASES = [['per_person', 'Per person'], ['per_child', 'Per child'], ['each', 'Each / per hour'], ['flat', 'Flat'], ['percent', '% charge']];
+  var PRICE_BASIS_LABEL = {};
+  PRICE_BASES.forEach(function (b) { PRICE_BASIS_LABEL[b[0]] = b[1]; });
+  var PRICE_COUNT_MODES = [['expected', 'Everyone not declined'], ['attending', 'Attending only'], ['all', 'Everyone on the list'], ['custom', 'Custom number']];
+  var PRICE_STANDARD_OPTIONS = ['Plated', 'Family style', 'Buffet', 'Stations'];
+  var priceCount = { mode: 'expected', adults: 0, kids: 0 };
+
+  function loadPriceLines() {
+    return fetch('/api/price-lines').then(function (res) { return res.json(); }).then(function (data) { priceLines = data; }).catch(function () { priceLines = []; });
+  }
+  function priceCategory() {
+    var picked = $('waCategoryFilter').value;
+    return picked === 'all' ? 'Caterer' : picked;
+  }
+  function priceGuestCounts() {
+    if (priceCount.mode === 'custom') return { adults: priceCount.adults, kids: priceCount.kids };
+    var counts = { adults: 0, kids: 0 };
+    guests.forEach(function (g) {
+      if (priceCount.mode === 'attending' && g.rsvpStatus !== 'Attending') return;
+      if (priceCount.mode === 'expected' && g.rsvpStatus === 'Not attending') return;
+      (g.members || []).forEach(function (m) { if (m.isChild) counts.kids++; else counts.adults++; });
+    });
+    return counts;
+  }
+  function priceKey(name) { return (name || '').trim().toLowerCase(); }
+  function priceVendorLines(vendorId) { return priceLines.filter(function (l) { return l.vendorId === vendorId; }); }
+  // Each named option gets its own total, and a line with no option counts toward every one.
+  function priceOptions(lines) {
+    var seen = {}, names = [];
+    lines.forEach(function (l) {
+      var key = priceKey(l.optionName);
+      if (key && !seen[key]) { seen[key] = true; names.push(l.optionName.trim()); }
+    });
+    return names.length ? names : [''];
+  }
+  function priceInOption(l, option) { return !priceKey(l.optionName) || priceKey(l.optionName) === priceKey(option); }
+  // Once an option has a child's price, "per person" means per adult.
+  function pricePeople(lines, option, counts) {
+    var childPriced = lines.some(function (l) { return l.included && l.basis === 'per_child' && priceInOption(l, option); });
+    return childPriced ? counts.adults : counts.adults + counts.kids;
+  }
+  function priceLineAmount(l, people, counts) {
+    if (l.basis === 'per_person') return l.price * Math.max(people, l.quantity || 0);
+    if (l.basis === 'per_child') return l.price * counts.kids;
+    if (l.basis === 'each') return l.price * (l.quantity == null ? 1 : l.quantity);
+    if (l.basis === 'flat') return l.price;
+    return 0;
+  }
+  function priceIsTax(l) { return /tax/i.test(l.item); }
+  // Service charges are a percentage of the subtotal. Tax is charged on the
+  // subtotal plus those charges, the way most states tax a service charge.
+  function priceTotals(lines, option, counts) {
+    var people = pricePeople(lines, option, counts);
+    var used = lines.filter(function (l) { return l.included && priceInOption(l, option); });
+    var t = { perPerson: 0, other: 0, fees: 0, tax: 0 };
+    used.forEach(function (l) {
+      if (l.basis === 'per_person' || l.basis === 'per_child') t.perPerson += priceLineAmount(l, people, counts);
+      else if (l.basis !== 'percent') t.other += priceLineAmount(l, people, counts);
+    });
+    var subtotal = t.perPerson + t.other;
+    used.forEach(function (l) { if (l.basis === 'percent' && !priceIsTax(l)) t.fees += subtotal * l.price / 100; });
+    used.forEach(function (l) { if (l.basis === 'percent' && priceIsTax(l)) t.tax += (subtotal + t.fees) * l.price / 100; });
+    t.total = subtotal + t.fees + t.tax;
+    var headcount = counts.adults + counts.kids;
+    t.perGuest = headcount ? t.total / headcount : null;
+    return t;
+  }
+  function priceLineAmountText(l, lines, counts) {
+    if (!l.included || l.basis === 'percent') return '';
+    return money(priceLineAmount(l, pricePeople(lines, l.optionName, counts), counts));
+  }
+  function priceValueText(basis, price) { return basis === 'percent' ? price + '%' : money(price); }
+  function priceQtyHint(basis) { return basis === 'per_person' ? 'Min.' : basis === 'each' ? 'Qty' : ''; }
+
+  function priceCountText(counts) {
+    var total = counts.adults + counts.kids;
+    return counts.adults + ' adult' + (counts.adults === 1 ? '' : 's') + (counts.kids ? ' + ' + counts.kids + ' child' + (counts.kids === 1 ? '' : 'ren') : '') +
+      (counts.kids ? ' = ' + total : '') + ' guest' + (total === 1 ? '' : 's');
+  }
+  function priceCountHtml(counts) {
+    var custom = priceCount.mode === 'custom';
+    return '<div class="pr-count"><label for="prCountMode">Guest count</label>' +
+      '<select id="prCountMode">' + PRICE_COUNT_MODES.map(function (m) {
+        return '<option value="' + m[0] + '"' + (m[0] === priceCount.mode ? ' selected' : '') + '>' + m[1] + '</option>';
+      }).join('') + '</select>' +
+      (custom ? '<label>Adults <input type="number" min="0" step="1" id="prCountAdults" value="' + counts.adults + '"></label>' +
+        '<label>Children <input type="number" min="0" step="1" id="prCountKids" value="' + counts.kids + '"></label>' : '') +
+      '<span id="prCountText">' + priceCountText(counts) + '</span>' +
+    '</div>';
+  }
+  function priceSummaryHtml(list, counts) {
+    var rows = [];
+    list.forEach(function (v) {
+      var lines = priceVendorLines(v.id);
+      if (!lines.length) return;
+      priceOptions(lines).forEach(function (option, i) {
+        rows.push({ vendor: v, option: option, first: i === 0, t: priceTotals(lines, option, counts) });
+      });
+    });
+    if (!rows.length) return siteNote('No prices yet. Upload a menu or add lines under a vendor below.');
+    var totals = rows.map(function (r) { return r.t.total; }).filter(function (n) { return n > 0; });
+    var lowest = totals.length > 1 ? Math.min.apply(null, totals) : null;
+    return '<div style="overflow-x:auto;"><table class="pr-table"><tr><th>Vendor</th><th>Option</th><th class="num">Per person</th><th class="num">Other</th>' +
+      '<th class="num">Service</th><th class="num">Tax</th><th class="num">Total</th><th class="num">Per guest</th></tr>' +
+      rows.map(function (r) {
+        var classes = (r.first ? 'pr-vendor-start' : '') + (lowest !== null && r.t.total === lowest ? ' pr-best' : '');
+        return '<tr class="' + classes + '"><td>' + (r.first ? escapeHtml(r.vendor.name) : '') + '</td>' +
+          '<td>' + escapeHtml(r.option || 'All') + '</td>' +
+          ['perPerson', 'other', 'fees', 'tax', 'total'].map(function (k) { return '<td class="num">' + money(r.t[k]) + '</td>'; }).join('') +
+          '<td class="num">' + (r.t.perGuest == null ? '' : money(r.t.perGuest)) + '</td></tr>';
+      }).join('') + '</table></div>' +
+      (lowest !== null ? siteNote('Lowest total in gold. Totals are estimates from the prices listed here, before anything a vendor adds in a quote.') : '');
+  }
+
+  function priceLineRowHtml(l, lines, counts) {
+    var hint = priceQtyHint(l.basis);
+    return '<tr data-line="' + l.id + '">' +
+      '<td><input type="checkbox" data-pf="included"' + (l.included ? ' checked' : '') + ' aria-label="Count this line in the totals"></td>' +
+      '<td><input type="text" data-pf="optionName" value="' + budAttr(l.optionName) + '" placeholder="Every option" list="prOptions-' + l.vendorId + '" aria-label="Option"></td>' +
+      '<td><input type="text" data-pf="item" value="' + budAttr(l.item) + '" placeholder="What it\'s for" aria-label="Item"' +
+        (l.quote ? ' title="' + budAttr('From the document: ' + l.quote) + '"' : '') + '></td>' +
+      '<td><select data-pf="basis" aria-label="Priced">' + PRICE_BASES.map(function (b) {
+        return '<option value="' + b[0] + '"' + (b[0] === l.basis ? ' selected' : '') + '>' + b[1] + '</option>';
+      }).join('') + '</select></td>' +
+      '<td class="num"><input type="number" min="0" step="0.01" class="pr-num" data-pf="price" value="' + l.price + '" aria-label="Price"></td>' +
+      '<td class="num"><input type="number" min="0" step="1" class="pr-num" data-pf="quantity" value="' + (l.quantity == null ? '' : l.quantity) + '" placeholder="' + hint + '"' + (hint ? '' : ' disabled') + ' aria-label="Quantity or minimum guests"></td>' +
+      '<td class="num" data-amount="' + l.id + '">' + priceLineAmountText(l, lines, counts) + '</td>' +
+      '<td><button type="button" class="btn-small wa-task-delete" data-price-action="delete" data-id="' + l.id + '">Remove</button></td>' +
+    '</tr>';
+  }
+  function priceFoundHtml(d) {
+    var lines = d.extraction.lines;
+    var perPersonByOption = {};
+    lines.forEach(function (l) {
+      if (l.basis === 'per_person') perPersonByOption[l.option || 'Every option'] = (perPersonByOption[l.option || 'Every option'] || 0) + 1;
+    });
+    var choices = Object.keys(perPersonByOption).filter(function (k) { return perPersonByOption[k] > 1; });
+    return d.extraction.warnings.map(function (w) { return '<div class="bud-warning">' + escapeHtml(w) + '</div>'; }).join('') +
+      (lines.length ? '<div class="bud-warning">Found by your local AI, so check each price against the file. Percentages for service charges and tax are found by text search.</div>' : '') +
+      (choices.length ? siteNote(choices.map(escapeHtml).join(', ') + ' ha' + (choices.length === 1 ? 's' : 've') + ' more than one per-person price. If some are a choice of entrée rather than add-ons, untick all but one after adding them.') : '') +
+      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Min.</th></tr>' +
+        lines.map(function (l, i) {
+          return '<tr><td><input type="checkbox" class="pr-pick" data-idx="' + i + '" checked aria-label="Add this price"></td>' +
+            '<td>' + escapeHtml(l.option || 'Every option') + '</td>' +
+            '<td>' + escapeHtml(l.item) + (l.quote ? '<div class="pr-quote">"' + escapeHtml(l.quote) + '"</div>' : '') + '</td>' +
+            '<td>' + escapeHtml(PRICE_BASIS_LABEL[l.basis] || l.basis) + '</td>' +
+            '<td class="num">' + priceValueText(l.basis, l.price) + '</td>' +
+            '<td class="num">' + (l.quantity == null ? '' : l.quantity) + '</td></tr>';
+        }).join('') + '</table></div>' : '');
+  }
+  // One uploaded price sheet: still reading, failed, or waiting for review.
+  function priceDocHtml(d) {
+    var html = '<div class="bud-ledger" data-price-doc="' + d.id + '"><div class="bud-ledger-head">' + docFileLink(d) + '</div>';
+    var status = d.extractionStatus;
+    if (status === 'queued' || status === 'processing') {
+      return html + siteNote(status === 'queued' ? 'Waiting to be read.' : 'Reading the prices. This can take a few minutes.') + '</div>';
+    }
+    var buttons = '<button type="button" class="btn-small" style="color:var(--text-dim)" data-price-action="dismiss" data-id="' + d.id + '">Dismiss</button>';
+    if (status !== 'review' || !d.extraction || d.extraction.docType !== 'pricesheet') {
+      return html + '<div class="bud-warning">' + escapeHtml(d.extractionError || "Couldn't read the prices in this file.") + '</div>' +
+        '<div class="bud-ledger-buttons">' + (status === 'manual' ? '' : '<button type="button" class="btn-small" style="color:var(--accent)" data-price-action="reread" data-id="' + d.id + '">Read again</button>') + buttons + '</div></div>';
+    }
+    var picker = d.relatedType === 'vendor' ? '' : '<div class="wa-field" style="max-width:320px; margin:6px 0;"><label>Which vendor is this from?</label><select data-price-vendor-pick>' +
+      '<option value="">Choose a vendor</option>' + vendors.map(function (v) { return '<option value="' + v.id + '">' + escapeHtml(v.name) + '</option>'; }).join('') + '</select></div>';
+    var count = d.extraction.lines.length;
+    return html + priceFoundHtml(d) + picker +
+      '<div class="bud-ledger-buttons">' +
+        (count ? '<button type="button" class="btn-small" style="color:var(--accent)" data-price-action="apply" data-id="' + d.id + '">Add ticked prices</button>' : '') +
+        buttons +
+      '</div></div>';
+  }
+  function pricePendingDocs(match) {
+    return hubDocuments.filter(function (d) {
+      return d.docType === 'Price sheet' && ['applied', 'dismissed'].indexOf(d.extractionStatus) < 0 && match(d);
+    });
+  }
+  function priceVendorHtml(v, counts) {
+    var lines = priceVendorLines(v.id);
+    var docs = pricePendingDocs(function (d) { return d.relatedType === 'vendor' && d.relatedId === v.id; });
+    var optionNames = PRICE_STANDARD_OPTIONS.concat(priceOptions(lines).filter(function (o) {
+      return o && PRICE_STANDARD_OPTIONS.map(priceKey).indexOf(priceKey(o)) < 0;
+    }));
+    return '<div class="pr-vendor" data-vendor="' + v.id + '">' +
+      '<div class="pr-vendor-head"><h3 class="pr-vendor-name">' + escapeHtml(v.name) + '</h3>' +
+        '<span class="bud-line-actions">' +
+          '<label class="btn-small" style="color:var(--accent); cursor:pointer;">Upload menu or pricing' +
+            '<input type="file" hidden data-price-upload="' + v.id + '" accept="application/pdf,image/png,image/jpeg,image/webp"></label>' +
+          '<button type="button" class="btn-small" style="color:var(--accent)" data-price-action="add" data-id="' + v.id + '">+ Add line</button>' +
+        '</span></div>' +
+      '<div class="wa-form-error" data-price-msg="' + v.id + '"></div>' +
+      docs.map(priceDocHtml).join('') +
+      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Qty / min.</th><th class="num">Amount</th><th></th></tr>' +
+        lines.map(function (l) { return priceLineRowHtml(l, lines, counts); }).join('') + '</table></div>'
+        : (docs.length ? '' : siteNote('No prices yet.'))) +
+      '<datalist id="prOptions-' + v.id + '">' + optionNames.map(function (o) { return '<option value="' + budAttr(o) + '">'; }).join('') + '</datalist>' +
+    '</div>';
+  }
+  function renderPricePanel() {
+    var panel = $('waPricePanel');
+    if (panel.hidden) return;
+    var category = priceCategory();
+    var list = vendors.filter(function (v) { return v.category === category; });
+    var counts = priceGuestCounts();
+    var unlinked = pricePendingDocs(function (d) { return !d.relatedType; });
+    panel.innerHTML = '<div class="bud-ledger-head">' + escapeHtml(category) + ' price sheets</div>' +
+      '<div class="wa-fetch-row" style="margin:6px 0;"><button type="button" class="btn-ghost" id="prCloseBtn">Close</button></div>' +
+      priceCountHtml(counts) +
+      '<div id="prSummary">' + (list.length ? priceSummaryHtml(list, counts) : siteNote('No vendors in this category. Pick another category above.')) + '</div>' +
+      unlinked.map(priceDocHtml).join('') +
+      list.map(function (v) { return priceVendorHtml(v, counts); }).join('');
+  }
+  // While typing, only the numbers change, so the field being edited keeps focus.
+  function priceRefreshNumbers() {
+    var counts = priceGuestCounts();
+    var list = vendors.filter(function (v) { return v.category === priceCategory(); });
+    $('prCountText').textContent = priceCountText(counts);
+    $('prSummary').innerHTML = priceSummaryHtml(list, counts);
+    list.forEach(function (v) {
+      var lines = priceVendorLines(v.id);
+      lines.forEach(function (l) {
+        var cell = document.querySelector('[data-amount="' + l.id + '"]');
+        if (cell) cell.textContent = priceLineAmountText(l, lines, counts);
+      });
+    });
+  }
+  function priceEditing() {
+    var el = document.activeElement;
+    return !!el && el !== document.body && $('waPricePanel').contains(el) && /^(INPUT|SELECT)$/.test(el.tagName);
+  }
+  function priceLineFor(el) {
+    var row = el.closest('tr[data-line]');
+    return row ? priceLines.find(function (l) { return l.id === row.dataset.line; }) : null;
+  }
+  function priceSetField(line, field, input) {
+    if (field === 'included') line.included = input.checked;
+    else if (field === 'price') line.price = Math.max(0, parseFloat(input.value) || 0);
+    else if (field === 'quantity') line.quantity = input.value === '' ? null : Math.max(0, parseFloat(input.value) || 0);
+    else line[field] = input.value;
+  }
+  function priceSave(line) {
+    fetch('/api/price-lines/' + line.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ optionName: line.optionName, item: line.item, basis: line.basis, price: line.price, quantity: line.quantity, included: line.included })
+    }).then(function (res) {
+      if (!res.ok) alert('Could not save that price.');
+    }).catch(function () { alert('Could not reach the server.'); });
+  }
+  function priceAdd(vendorId) {
+    var lines = priceVendorLines(vendorId);
+    var last = lines[lines.length - 1];
+    fetch('/api/vendors/' + vendorId + '/price-lines', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ optionName: last ? last.optionName : '', item: '', basis: last && last.basis !== 'percent' ? last.basis : 'per_person', price: 0 })
+    }).then(function (res) {
+      if (!res.ok) { alert('Could not add a line.'); return; }
+      return res.json().then(function (line) {
+        priceLines.push(line);
+        renderPricePanel();
+        var input = document.querySelector('tr[data-line="' + line.id + '"] [data-pf="item"]');
+        if (input) input.focus();
+      });
+    }).catch(function () { alert('Could not reach the server.'); });
+  }
+  function priceDelete(lineId) {
+    fetch('/api/price-lines/' + lineId, { method: 'DELETE' }).then(function (res) {
+      if (!res.ok) { alert('Could not remove that line.'); return; }
+      priceLines = priceLines.filter(function (l) { return l.id !== lineId; });
+      renderPricePanel();
+    }).catch(function () { alert('Could not reach the server.'); });
+  }
+  function priceApply(doc, box) {
+    var pick = box.querySelector('[data-price-vendor-pick]');
+    var vendorId = doc.relatedType === 'vendor' ? doc.relatedId : (pick && pick.value);
+    if (!vendorId) { alert('Choose which vendor these prices are from.'); return; }
+    var picked = Array.prototype.filter.call(box.querySelectorAll('.pr-pick'), function (cb) { return cb.checked; })
+      .map(function (cb) { return doc.extraction.lines[+cb.dataset.idx]; });
+    if (!picked.length && !confirm('No prices are ticked. Mark this file as done without adding any?')) return;
+    fetch('/api/documents/' + doc.id + '/price-lines/apply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendorId: vendorId, lines: picked.map(function (l) {
+        return { optionName: l.option, item: l.item, basis: l.basis, price: l.price, quantity: l.quantity, included: true, quote: l.quote || '' };
+      }) })
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) { alert(typeof data.detail === 'string' ? data.detail : 'Could not add those prices.'); return; }
+        priceLines = priceLines.filter(function (l) { return l.vendorId !== vendorId; }).concat(data.lines);
+        docUpdate(data.document);
+      });
+    }).catch(function () { alert('Could not reach the server.'); });
+  }
+  function priceUpload(input) {
+    var vendorId = input.dataset.priceUpload;
+    var file = input.files[0];
+    var msg = document.querySelector('[data-price-msg="' + vendorId + '"]');
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { msg.textContent = 'That file is over the 25 MB limit.'; return; }
+    msg.textContent = 'Uploading…';
+    var body = new FormData();
+    body.append('file', file);
+    body.append('docType', 'Price sheet');
+    body.append('relatedType', 'vendor');
+    body.append('relatedId', vendorId);
+    fetch('/api/documents', { method: 'POST', body: body }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) { msg.textContent = typeof data.detail === 'string' ? data.detail : 'Could not upload that file.'; return; }
+        hubDocuments.unshift(data);
+        renderDocumentViews();
+        docPollIfBusy();
+      });
+    }).catch(function () { msg.textContent = 'Could not reach the server.'; });
+  }
+  function openPricePanel(category) {
+    if (category) $('waCategoryFilter').value = category;
+    $('waPricePanel').hidden = false;
+    renderVendors();
+    renderPricePanel();
+  }
+
+  $('waPriceBtn').addEventListener('click', function () {
+    $('waPricePanel').hidden = !$('waPricePanel').hidden;
+    renderPricePanel();
+  });
+  $('waPricePanel').addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.id === 'prCloseBtn') { $('waPricePanel').hidden = true; return; }
+    var action = t.dataset.priceAction;
+    if (!action) return;
+    if (action === 'add') { priceAdd(t.dataset.id); return; }
+    if (action === 'delete') { priceDelete(t.dataset.id); return; }
+    var doc = hubDocuments.find(function (d) { return d.id === t.dataset.id; });
+    if (!doc) return;
+    if (action === 'apply') priceApply(doc, t.closest('[data-price-doc]'));
+    if (action === 'dismiss') docPost(doc.id, 'dismiss');
+    if (action === 'reread') docPost(doc.id, 'read-again');
+  });
+  $('waPricePanel').addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.id === 'prCountAdults' || t.id === 'prCountKids') {
+      priceCount[t.id === 'prCountAdults' ? 'adults' : 'kids'] = Math.max(0, parseInt(t.value, 10) || 0);
+      priceRefreshNumbers();
+      return;
+    }
+    var line = t.dataset.pf && priceLineFor(t);
+    if (!line) return;
+    priceSetField(line, t.dataset.pf, t);
+    priceRefreshNumbers();
+  });
+  $('waPricePanel').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'prCountMode') {
+      if (t.value === 'custom') {
+        var current = priceGuestCounts();
+        priceCount.adults = current.adults;
+        priceCount.kids = current.kids;
+      }
+      priceCount.mode = t.value;
+      renderPricePanel();
+      return;
+    }
+    if (t.dataset.priceUpload !== undefined) { priceUpload(t); return; }
+    var line = t.dataset.pf && priceLineFor(t);
+    if (!line) return;
+    priceSetField(line, t.dataset.pf, t);
+    if (t.dataset.pf === 'basis') {
+      var qty = t.closest('tr').querySelector('[data-pf="quantity"]');
+      qty.placeholder = priceQtyHint(line.basis);
+      qty.disabled = !priceQtyHint(line.basis);
+    }
+    priceRefreshNumbers();
+    priceSave(line);
+  });
+
   function vendorCardHtml(v) {
     var tier = STATUS_TIER[v.status] || 'neutral';
     var followUps = v.contacts.map(function (c) { return c.followUpDate; }).filter(Boolean).sort(function (a, b) { return a - b; });
@@ -2741,7 +3138,7 @@
       if (details) { details.hidden = false; toggle.textContent = 'Hide details'; }
     });
   }
-  $('waCategoryFilter').addEventListener('change', function () { renderVendors(); renderComparePanel(); });
+  $('waCategoryFilter').addEventListener('change', function () { renderVendors(); renderComparePanel(); renderPricePanel(); });
   $('waStatusFilter').addEventListener('change', renderVendors);
 
   $('waVendorList').addEventListener('click', function (e) {
@@ -2770,8 +3167,9 @@
   function loadVendors() {
     return Promise.all([
       fetch('/api/vendors').then(function (res) { return res.json(); }).then(function (data) { vendors = data; }).catch(function () { vendors = []; }),
-      loadSiteReviews()
-    ]).then(renderVendors);
+      loadSiteReviews(),
+      loadPriceLines()
+    ]).then(function () { renderVendors(); if (!priceEditing()) renderPricePanel(); });
   }
 
   function respondToEmailActivity(emailId, action) {
@@ -3234,7 +3632,10 @@
   });
 
   function loadGuests() {
-    return fetch('/api/guests').then(function (res) { return res.json(); }).then(function (data) { guests = data; }).catch(function () { guests = []; }).then(renderGuests);
+    return fetch('/api/guests').then(function (res) { return res.json(); }).then(function (data) { guests = data; }).catch(function () { guests = []; }).then(function () {
+      renderGuests();
+      if (!priceEditing()) renderPricePanel();
+    });
   }
 
   $('gstSyncBtn').addEventListener('click', function () {
@@ -4063,7 +4464,7 @@
   });
 
   // ==================== Documents ====================
-  var DOC_TYPES = ['Contract', 'Invoice', 'Receipt', 'Other'];
+  var DOC_TYPES = ['Contract', 'Invoice', 'Receipt', 'Price sheet', 'Other'];
   var hubDocuments = [];
   var editingDocId = null;
   populateSelect($('docFieldType'), DOC_TYPES, false);
@@ -4189,6 +4590,7 @@
       docPollTimer = null;
       loadDocuments().then(function () {
         if (!docReviewId && !docReqId) renderDocuments();
+        if (!priceEditing()) renderPricePanel();
         docPollIfBusy();
       });
     }, 5000);
@@ -4353,7 +4755,7 @@
     var status = d.requirementsStatus;
     if (['queued', 'processing'].indexOf(status) >= 0) return '<span style="font-size:0.8125rem; color:var(--text-dim);">Finding requirements</span>';
     if (status === 'review') return '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="req-review" data-id="' + d.id + '">Review requirements (' + (d.requirements.length + d.requirementCandidates.length) + ')</button>';
-    if (['queued', 'processing', 'manual'].indexOf(d.extractionStatus) >= 0 || !d.extraction || d.extraction.docType === 'receipt') return '';
+    if (['queued', 'processing', 'manual'].indexOf(d.extractionStatus) >= 0 || !d.extraction || ['receipt', 'pricesheet'].indexOf(d.extraction.docType) >= 0) return '';
     var label = { none: 'None found. Look again', failed: 'Find requirements again', dismissed: 'Find requirements', applied: 'Look for more requirements' }[status] || 'Find requirements';
     return '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="req-find" data-id="' + d.id + '">' + label + '</button>';
   }
@@ -4466,14 +4868,16 @@
       var item = budgetItems.find(function (i) { return i.id === d.budgetItemId; });
       if (item) parts.push('Budget: ' + escapeHtml(item.description));
       if (d.notes) parts.push(escapeHtml(d.notes));
-      var status = DOC_STATUS[d.extractionStatus];
-      var canReview = ['review', 'manual', 'failed', 'dismissed'].indexOf(d.extractionStatus) >= 0;
+      var isPriceSheet = d.extraction ? d.extraction.docType === 'pricesheet' : d.docType === 'Price sheet';
+      var status = isPriceSheet && d.extractionStatus === 'applied' ? ['Added to price sheet', 'positive'] : DOC_STATUS[d.extractionStatus];
+      var canReview = !isPriceSheet && ['review', 'manual', 'failed', 'dismissed'].indexOf(d.extractionStatus) >= 0;
       var canReread = ['failed', 'dismissed', 'manual'].indexOf(d.extractionStatus) >= 0;
       return '<div class="wa-contact-entry bud-line">' +
         '<div class="bud-line-main">' + docFileLink(d) + ' <span style="color:var(--text-dim);">&middot; ' + parts.join(' &middot; ') + '</span></div>' +
         '<div class="bud-line-actions">' +
           (status ? '<span class="wa-stamp tier-' + status[1] + '">' + escapeHtml(status[0]) + '</span>' : '') +
           (canReview ? '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="review" data-id="' + d.id + '">Review</button>' : '') +
+          (isPriceSheet && d.extractionStatus === 'review' ? '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="price-review" data-id="' + d.id + '">Review prices</button>' : '') +
           (canReread ? '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="read-again" data-id="' + d.id + '">Read again</button>' : '') +
           docReqActionHtml(d) +
           '<button type="button" class="btn-small" style="color:var(--accent)" data-doc-action="edit" data-id="' + d.id + '">Edit</button>' +
@@ -4489,6 +4893,7 @@
     renderBudget();
     renderList();
     renderVendors();
+    renderPricePanel();
     renderTimeline();
   }
   $('docList').addEventListener('click', function (e) {
@@ -4504,6 +4909,13 @@
     var doc = hubDocuments.find(function (d) { return d.id === e.target.dataset.id; });
     if (!doc) return;
     if (action === 'edit') { openDocForm(doc); return; }
+    if (action === 'price-review') {
+      var owner = doc.relatedType === 'vendor' && vendors.find(function (v) { return v.id === doc.relatedId; });
+      document.querySelector('.site-tab[data-tab="vendors"]').click();
+      openPricePanel(owner ? owner.category : null);
+      $('waPricePanel').scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
     if (action === 'review') { docReviewId = docReviewId === doc.id ? null : doc.id; renderDocuments(); return; }
     if (action === 'read-again') { docPost(doc.id, 'read-again'); return; }
     if (action === 'req-review') { docReqId = docReqId === doc.id ? null : doc.id; renderDocuments(); return; }
