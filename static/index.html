@@ -1099,7 +1099,7 @@
       <h2 class="help-section-title">Vendors</h2>
       <p class="help-body">Same idea as Venues, for caterers, photographers, florists, and other vendors. Paste a link to auto-fill, or enter by hand. Each vendor also has a contact log for jotting down when you reached out and what was said, handy once you're juggling several conversations.</p>
       <p class="help-body"><strong>Site review</strong> reads a vendor's own website for you. Use <strong>Review site</strong> in a vendor's Details, or <strong>Compare sites</strong> to review a whole category and see packages, prices and details side by side. It reads up to 8 pages per site, slowly and politely, so allow a few minutes per vendor. Prices come from a plain text search, so they're shown with the words around them. Check what they're for, because a site's lowest price may not be a wedding price. If a site has price lists for different years, each is labeled and the comparison leads with your wedding year. Everything the AI adds has to match the page word for word, and anything not on the site shows as "Not listed", which makes a handy list of questions to ask. Some sites refuse automated reading; for those, copy the page text from your browser and use <strong>Paste page text</strong>. Nothing is saved to the vendor until you press Save.</p>
-      <p class="help-body"><strong>Price sheets</strong> lays a category's prices out like a spreadsheet (caterers unless you've picked another category). Each line is one price: per person, per child, each or per hour, a flat fee, or a percentage charge. Put lines under an option like Plated, Family style, Buffet or a package name, and every option gets its own total. A line with no option counts toward every option, so that's where a bartender, cake cutting fee or service charge goes. Totals follow your guest list live: everyone who hasn't declined, attending only, everyone, or a custom number to try out "what if we had 150?". Once an option has a child's price, "per person" counts adults only. A per-person line's "min." is the vendor's minimum guest count, and you're charged for at least that many. Service charges are a percentage of the subtotal, and anything named tax is charged on the subtotal plus service charges. Untick a line to leave it out, for example when a menu lists a choice of entrées. <strong>Upload menu or pricing</strong> takes a PDF or photo. Your local AI lists the prices it finds, keeps only prices that are actually printed in the file, and waits for you to tick what to add. Menus designed as images may not have readable text; type those in.</p>
+      <p class="help-body"><strong>Price sheets</strong> lays a category's prices out like a spreadsheet (caterers unless you've picked another category). Each line is one price: per person, per child, each or per hour, a flat fee, or a percentage charge. Put lines under an option like Plated, Family style, Buffet or a package name, and every option gets its own total. A line with no option counts toward every option, so that's where a bartender, cake cutting fee or service charge goes. Totals follow your guest list live: everyone who hasn't declined, attending only, everyone, or a custom number to try out "what if we had 150?". Once an option has a child's price, "per person" counts adults only. A per-person line's "min." is the vendor's minimum guest count, and you're charged for at least that many. Service charges are a percentage of the subtotal, and anything named tax is charged on the subtotal plus service charges. Untick a line to leave it out, for example when a menu lists a choice of entrées. <strong>Upload menu or pricing</strong> takes a PDF or photo. Your local AI lists the prices it finds, keeps only prices that are actually printed in the file, and waits for you to tick what to add. Menus designed as images may not have readable text; type those in. If a vendor's site links to PDFs, <strong>Review site</strong> lists them, and <strong>Add to price sheets</strong> downloads one for you, in the vendor's Details or right in the price sheet panel.</p>
       <p class="help-body">If a vendor has a physical shop you might visit (a florist, a bakery, a bridal shop), fill in <strong>Address</strong> and <strong>Hours</strong> so you know when they're open. If someone from a vendor is staying for the reception and needs a seat, usually a photographer, videographer, DJ/band, or officiant, check <strong>"Needs a seat at the reception"</strong> on their form. That's what makes them show up on the Seating tab. It's checked by default for those categories, but you can change it per vendor.</p>
       <p class="help-body" data-feature="emailSync"><strong>Sync vendor emails</strong> (also on the Venues tab as "Sync venue emails" — either button runs the same check) runs by itself every 15 minutes, and the button checks right away. It reads recent messages from the shared mailbox and matches them to vendors and venues by email address, Reply-To, or exact sender display name (see Venues above for what that last one is for — same platforms, same fix, no separate setup for Vendors). It also keeps a thread together and notices a vendor's or venue's name in the subject or body. Real-looking mail from anyone else appears on the Dashboard under "Emails to place," where you pick who it belongs to; newsletters and login codes are skipped. When it finds a match, the local AI model suggests a status update and/or a proposed appointment, shown under that card's Details as "Recent email activity." Nothing changes on its own — accept a suggestion to actually apply it, or dismiss it. Read-only against the mailbox: this never sends anything.</p>
       <p class="help-body">Each vendor and venue card also shows a second badge next to its status — <strong>"Waiting on vendor,"</strong> <strong>"Needs your response,"</strong> or <strong>"In progress."</strong> This is separate from Status (which tracks the overall funnel — booked, declined, etc.) and answers "whose turn is it right now." It updates itself from synced email automatically (whoever sent the last message, that's who the other side is waiting on), and you can also set it by hand when logging a phone/in-person contact — whichever happened more recently wins, so there's nothing to keep in sync manually.</p>
@@ -2568,6 +2568,59 @@
       '<button type="button" class="btn-small" style="color:var(--accent)" data-site-action="paste" data-id="' + v.id + '">Review pasted text</button>' +
     '</details>';
   }
+  // PDFs the site review found on the vendor's site. Adding one downloads it
+  // as a price sheet, which is then read and reviewed like an upload.
+  function sitePdfs(v) {
+    var review = siteReviews[v.id];
+    return (review && review.result && review.result.pdfs) || [];
+  }
+  function sitePdfName(p) {
+    if (p.label) return p.label;
+    var path = p.url.split('?')[0];
+    try { return decodeURIComponent(path.slice(path.lastIndexOf('/') + 1)); } catch (e) { return path.slice(path.lastIndexOf('/') + 1); }
+  }
+  function sitePdfRowHtml(v, p, i) {
+    var doc = p.documentId && hubDocuments.find(function (d) { return d.id === p.documentId; });
+    return '<div style="font-size:0.875rem; margin-bottom:4px;">' + escapeHtml(sitePdfName(p)) + siteSource(p.url) + ' &middot; ' +
+      (doc ? '<span style="color:var(--text-dim);">Added as ' + docFileLink(doc) + '</span>'
+        : '<button type="button" class="btn-small" style="color:var(--accent)" data-site-pdf="' + i + '" data-id="' + v.id + '">Add to price sheets</button>') +
+    '</div>';
+  }
+  function sitePdfsHtml(v, onlyNew) {
+    var rows = sitePdfs(v).map(function (p, i) {
+      var added = p.documentId && hubDocuments.some(function (d) { return d.id === p.documentId; });
+      return onlyNew && added ? '' : sitePdfRowHtml(v, p, i);
+    }).join('');
+    return rows ? '<span class="wa-detail-label">PDFs on their site</span>' + rows : '';
+  }
+  function sitePdfAdd(btn) {
+    var v = vendors.find(function (x) { return x.id === btn.dataset.id; });
+    var p = v && sitePdfs(v)[+btn.dataset.sitePdf];
+    if (!p) return;
+    btn.disabled = true;
+    btn.textContent = 'Downloading…';
+    fetch('/api/vendors/' + v.id + '/site-pdfs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: p.url })
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) {
+          alert(typeof data.detail === 'string' ? data.detail : 'Could not add that PDF.');
+          btn.disabled = false;
+          btn.textContent = 'Add to price sheets';
+          return;
+        }
+        siteReviews[v.id] = data.review;
+        if (!hubDocuments.some(function (d) { return d.id === data.document.id; })) hubDocuments.unshift(data.document);
+        renderDocumentViews();
+        docPollIfBusy();
+      });
+    }).catch(function () {
+      alert('Could not reach the server.');
+      btn.disabled = false;
+      btn.textContent = 'Add to price sheets';
+    });
+  }
+
   function siteReviewHtml(v) {
     var review = siteReviews[v.id];
     var head = '<div class="bud-ledger"><div class="bud-ledger-head">Site review</div>';
@@ -2596,6 +2649,7 @@
         }).join('') +
         (missing.length ? siteNote('Not listed, worth asking: ' + missing.map(escapeHtml).join(', ') + '.') : '') +
         (contactBits.length ? siteNote('Contact on the site: ' + contactBits.join(' &middot; ')) : '') +
+        sitePdfsHtml(v, false) +
         '<span class="wa-detail-label" style="margin-top:8px;">Save to pricing notes</span>' +
         '<textarea class="site-keep" data-site-notes="' + v.id + '" rows="5" style="width:100%;">' + escapeHtml(siteNotes(v, review)) + '</textarea>' +
         '<button type="button" class="btn-small" style="color:var(--accent)" data-site-action="save" data-id="' + v.id + '">Save to vendor</button>') +
@@ -2771,8 +2825,9 @@
 
   function priceCountText(counts) {
     var total = counts.adults + counts.kids;
-    return counts.adults + ' adult' + (counts.adults === 1 ? '' : 's') + (counts.kids ? ' + ' + counts.kids + ' child' + (counts.kids === 1 ? '' : 'ren') : '') +
-      (counts.kids ? ' = ' + total : '') + ' guest' + (total === 1 ? '' : 's');
+    var guestsText = total + ' guest' + (total === 1 ? '' : 's');
+    if (!counts.kids) return guestsText;
+    return counts.adults + ' adult' + (counts.adults === 1 ? '' : 's') + ' + ' + counts.kids + ' child' + (counts.kids === 1 ? '' : 'ren') + ' = ' + guestsText;
   }
   function priceCountHtml(counts) {
     var custom = priceCount.mode === 'custom';
@@ -2885,6 +2940,7 @@
           '<button type="button" class="btn-small" style="color:var(--accent)" data-price-action="add" data-id="' + v.id + '">+ Add line</button>' +
         '</span></div>' +
       '<div class="wa-form-error" data-price-msg="' + v.id + '"></div>' +
+      sitePdfsHtml(v, true) +
       docs.map(priceDocHtml).join('') +
       (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Qty / min.</th><th class="num">Amount</th><th></th></tr>' +
         lines.map(function (l) { return priceLineRowHtml(l, lines, counts); }).join('') + '</table></div>'
@@ -3020,6 +3076,7 @@
   $('waPricePanel').addEventListener('click', function (e) {
     var t = e.target;
     if (t.id === 'prCloseBtn') { $('waPricePanel').hidden = true; return; }
+    if (t.dataset.sitePdf !== undefined) { sitePdfAdd(t); return; }
     var action = t.dataset.priceAction;
     if (!action) return;
     if (action === 'add') { priceAdd(t.dataset.id); return; }
@@ -3148,6 +3205,7 @@
       if (details) { details.hidden = !details.hidden; t.textContent = details.hidden ? 'Details' : 'Hide details'; siteOpenIds[t.dataset.id] = !details.hidden; }
     }
     if (t.dataset.siteAction) siteAction(t);
+    if (t.dataset.sitePdf !== undefined) sitePdfAdd(t);
     if (t.classList.contains('edit-btn')) { var v = vendors.find(function (x) { return x.id === t.dataset.id; }); if (v) openVendorFormForEdit(v); }
     if (t.classList.contains('delete-btn')) deleteVendor(t.dataset.id);
     if (t.classList.contains('del') && t.dataset.contact) deleteContact(t.dataset.vendor, t.dataset.contact);

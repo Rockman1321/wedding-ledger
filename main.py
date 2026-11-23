@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 from urllib import robotparser
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import quote, unquote, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -4837,6 +4837,10 @@ SITE_MAX_DELAY_SECONDS = 15
 SITE_MIN_PAGE_CHARS = 200
 SITE_MODEL_CHARS = 9000
 SITE_PASTE_CHARS = 30000
+SITE_MAX_PDFS = 8
+# How likely a PDF on a vendor's site is to be a menu or price list.
+SITE_PDF_LIKELY = re.compile(r"menu|pric|package|rates?\b|invest|collection|brochure|guide|wedding|catering", re.I)
+SITE_PDF_UNLIKELY = re.compile(r"privacy|terms|policy|waiver|application|agreement|contract|form\b|careers?|resume", re.I)
 SITE_MIN_PRICE = 50
 
 SITE_REVIEW_FIELDS = {
@@ -4917,7 +4921,7 @@ def site_host_is_public(host: str) -> bool:
     return bool(infos) and all(address_is_public(info[4][0]) for info in infos)
 
 
-def fetch_site_url(client: httpx.Client, url: str, home_site: str) -> tuple:
+def fetch_site_url(client: httpx.Client, url: str, home_site: str, max_bytes: int = SITE_MAX_BYTES) -> tuple:
     """Each hop is checked before it's requested: public host only, and never
     off the vendor's own site."""
     for _ in range(5):
@@ -4941,7 +4945,7 @@ def fetch_site_url(client: httpx.Client, url: str, home_site: str) -> tuple:
             body = b""
             for chunk in response.iter_bytes():
                 body += chunk
-                if len(body) > SITE_MAX_BYTES:
+                if len(body) > max_bytes:
                     break
             return response.status_code, response.headers.get("content-type", ""), body, url
     raise SiteRefused("too many redirects")
@@ -5013,6 +5017,32 @@ def site_links(html: str, base: str, home_site: str) -> tuple:
                 if re.search(r"contact|inquir|enquir", url + " " + label, re.I) and not contact["inquiry"]:
                     contact["inquiry"] = url
     return links, contact
+
+
+def site_pdf_links(html: str, base: str, home_site: str) -> List[tuple]:
+    """Same-site PDF links with their link text, like a "2027 Wedding Menu" link."""
+    try:
+        tree = lxml_html.fromstring(html)
+    except (ValueError, etree.ParserError):
+        return []
+    found = []
+    for anchor in tree.xpath("//a[@href]"):
+        url = urljoin(base, (anchor.get("href") or "").strip()).split("#")[0]
+        if urlparse(url).path.lower().endswith(".pdf") and site_key(urlparse(url).hostname or "") == home_site:
+            found.append((url, normalize_doc_text(anchor.text_content() or "")[:120]))
+    return found
+
+
+def site_pdf_rank(pdf: dict) -> int:
+    words = unquote(urlparse(pdf["url"]).path) + " " + pdf["label"]
+    if SITE_PDF_UNLIKELY.search(words):
+        return 2
+    return 0 if SITE_PDF_LIKELY.search(words) else 1
+
+
+def site_pdf_name(url: str) -> str:
+    name = unquote(Path(urlparse(url).path).name)
+    return "".join(c for c in name if c.isprintable())[:200] or "price-sheet.pdf"
 
 
 def site_structured_contact(html: str) -> dict:
@@ -5160,7 +5190,7 @@ def run_site_model(pages: List[tuple], fields: List[tuple], result: dict) -> Non
 
 def blank_site_result() -> dict:
     return {
-        "pages": [], "packages": [], "prices": [], "fields": {}, "warnings": [],
+        "pages": [], "packages": [], "prices": [], "fields": {}, "warnings": [], "pdfs": [],
         "contact": {"emails": [], "phones": [], "social": [], "inquiry": "", "address": "", "priceRange": ""},
     }
 
@@ -5204,6 +5234,8 @@ def crawl_vendor_site(start_url: str, fields: List[tuple]) -> tuple:
                 pass
 
         visited: set = set()
+        # Every PDF the site links to, read or not, so a menu can become a price sheet.
+        pdfs: dict = {}
         while len(result["pages"]) < SITE_MAX_PAGES:
             ready = [(score, url) for url, score in queue.items() if url not in visited and score > 0]
             if not ready:
@@ -5228,9 +5260,13 @@ def crawl_vendor_site(start_url: str, fields: List[tuple]) -> tuple:
                 continue
             if "pdf" in content_type.lower() or url.lower().split("?")[0].endswith(".pdf"):
                 text = site_pdf_text(body)
+                pdfs.setdefault(final_url, {"url": final_url, "label": ""})
             elif "html" in content_type.lower():
                 html = body.decode("utf-8", "replace")
                 text = site_html_text(html)
+                for pdf_url, label in site_pdf_links(html, final_url, home_site):
+                    entry = pdfs.setdefault(pdf_url, {"url": pdf_url, "label": label})
+                    entry["label"] = entry["label"] or label
                 links, contact = site_links(html, final_url, home_site)
                 structured = site_structured_contact(html)
                 add_site_contact(result, contact)
@@ -5243,6 +5279,9 @@ def crawl_vendor_site(start_url: str, fields: List[tuple]) -> tuple:
             add_site_prices(result, site_price_mentions(text, final_url))
             if len(text) >= SITE_MIN_PAGE_CHARS:
                 pages_to_read.append((text, final_url))
+    result["pdfs"] = sorted(
+        (pdf for pdf in pdfs.values() if robots.can_fetch(SITE_REVIEW_UA, pdf["url"])), key=site_pdf_rank,
+    )[:SITE_MAX_PDFS]
     read_any = any(page["status"] == "read" and page["chars"] for page in result["pages"])
     if not read_any:
         result["warnings"].append("Couldn't read this site automatically.")
@@ -5355,6 +5394,96 @@ def save_site_review(vendor_id: str, save: SiteReviewSave):
     if not updated:
         raise HTTPException(status_code=404, detail="Vendor not found")
     return {"saved": vendor_id}
+
+
+class SitePdfAdd(BaseModel):
+    url: str
+
+
+def fetch_site_pdf(site_url: str, url: str) -> bytes:
+    """Downloads a PDF the site review found, with the same checks as the
+    crawl: robots.txt, the vendor's own public site only, and a size cap."""
+    home_site = site_key(urlparse(site_url if "://" in site_url else "https://" + site_url).hostname or "")
+    parts = urlparse(url)
+    instead = "Download it from their site and upload it instead."
+    fallback = "Couldn't download that PDF. " + instead
+    robots = robotparser.RobotFileParser()
+    try:
+        with httpx.Client(timeout=30, headers={"User-Agent": SITE_REVIEW_UA}) as client:
+            status, _, robots_body, _ = fetch_site_url(client, f"{parts.scheme}://{parts.netloc}/robots.txt", home_site)
+            if status in (401, 403):
+                raise HTTPException(status_code=502, detail="This site refuses automated requests. " + instead)
+            if status == 200:
+                robots.parse(robots_body.decode("utf-8", "replace").splitlines())
+            else:
+                robots.allow_all = True
+            if not robots.can_fetch(SITE_REVIEW_UA, url):
+                raise HTTPException(status_code=502, detail="This site asks not to be read automatically. " + instead)
+            status, _, body, _ = fetch_site_url(client, url, home_site, max_bytes=MAX_DOCUMENT_BYTES)
+    except (httpx.HTTPError, SiteRefused):
+        raise HTTPException(status_code=502, detail=fallback)
+    if status != 200:
+        raise HTTPException(status_code=502, detail=fallback)
+    if len(body) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=413, detail="That PDF is over the 25 MB limit.")
+    if not body.startswith(b"%PDF-"):
+        raise HTTPException(status_code=502, detail="That link didn't return a PDF. " + instead)
+    return body
+
+
+@app.post("/api/vendors/{vendor_id}/site-pdfs")
+def add_site_pdf(vendor_id: str, request: SitePdfAdd):
+    """Saves a PDF from the vendor's site as a price sheet, which then reads
+    like any uploaded one. Only a PDF the site review found can be fetched."""
+    conn = get_db()
+    vendor = conn.execute("SELECT link FROM vendors WHERE id=?", (vendor_id,)).fetchone()
+    review = conn.execute("SELECT result FROM vendor_site_reviews WHERE vendor_id=?", (vendor_id,)).fetchone()
+    conn.close()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    pdfs = (json.loads(review["result"]) if review and review["result"] else {}).get("pdfs") or []
+    if not any(entry["url"] == request.url for entry in pdfs):
+        raise HTTPException(status_code=404, detail="That PDF isn't in this vendor's site review. Review the site again.")
+
+    body = fetch_site_pdf(vendor["link"], request.url)
+    digest = hashlib.sha256(body).hexdigest()
+    conn = get_db()
+    require_vendor(conn, vendor_id)
+    existing = conn.execute("SELECT id FROM documents WHERE sha256=?", (digest,)).fetchone()
+    if existing:
+        doc_id = existing["id"]
+    else:
+        doc_id = str(uuid.uuid4())
+        tmp_path = DOCUMENTS_DIR / f"{doc_id}.tmp"
+        try:
+            with open(tmp_path, "xb") as out:
+                os.fchmod(out.fileno(), 0o600)
+                out.write(body)
+            filename = site_pdf_name(request.url)
+            conn.execute(
+                """INSERT INTO documents (id, title, doc_type, filename, mime_type, size_bytes, sha256,
+                   related_type, related_id, budget_item_id, notes, date_added, extraction_status)
+                   VALUES (?, ?, ?, ?, 'application/pdf', ?, ?, 'vendor', ?, NULL, ?, ?, 'queued')""",
+                (doc_id, filename, PRICE_SHEET_DOC_TYPE, filename, len(body), digest, vendor_id,
+                 f"From their website: {request.url}"[:500], int(time.time() * 1000)),
+            )
+            os.replace(tmp_path, DOCUMENTS_DIR / doc_id)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    # Re-read the review: it may have changed during the download.
+    row = conn.execute("SELECT result FROM vendor_site_reviews WHERE vendor_id=?", (vendor_id,)).fetchone()
+    if row and row["result"]:
+        result = json.loads(row["result"])
+        for entry in result.get("pdfs") or []:
+            if entry["url"] == request.url:
+                entry["documentId"] = doc_id
+        conn.execute("UPDATE vendor_site_reviews SET result=? WHERE vendor_id=?", (json.dumps(result), vendor_id))
+    conn.commit()
+    extraction_wakeup.set()
+    doc = document_row_to_dict(conn.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone())
+    review_row = conn.execute("SELECT * FROM vendor_site_reviews WHERE vendor_id=?", (vendor_id,)).fetchone()
+    conn.close()
+    return {"document": doc, "review": site_review_row_to_dict(review_row), "existing": bool(existing)}
 
 
 # ==================== Venue comparison summary ====================
