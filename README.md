@@ -50,6 +50,12 @@ sudo systemctl enable --now wedding-hub
 
 The database and starting checklist get created on first run.
 
+To update the server later from a checkout on another machine, put
+`DEPLOY_HOST=<your ssh host>` in a `.deploy.local` file next to the repo
+(it's gitignored) and run `./deploy.sh`. It copies the committed `main`
+branch, backs up the live files, restarts the service and checks that it
+comes back up. Database changes apply themselves on startup.
+
 ## Settings
 
 All settings are environment variables in the systemd unit. The main ones:
