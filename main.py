@@ -4842,6 +4842,7 @@ SITE_MAX_PDFS = 8
 # How likely a PDF on a vendor's site is to be a menu or price list.
 SITE_PDF_LIKELY = re.compile(r"menu|pric|package|rates?\b|invest|collection|brochure|guide|wedding|catering", re.I)
 SITE_PDF_UNLIKELY = re.compile(r"privacy|terms|policy|waiver|application|agreement|contract|form\b|careers?|resume", re.I)
+SITE_PDF_GENERIC_LABEL = re.compile(r"(click )?(here|download( pdf| now)?|view( pdf)?|open|pdf|link|more|read more)\W*$", re.I)
 SITE_MIN_PRICE = 50
 
 SITE_REVIEW_FIELDS = {
@@ -5449,7 +5450,8 @@ def add_site_pdf(vendor_id: str, request: SitePdfAdd):
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     pdfs = (json.loads(review["result"]) if review and review["result"] else {}).get("pdfs") or []
-    if not any(entry["url"] == request.url for entry in pdfs):
+    found = next((entry for entry in pdfs if entry["url"] == request.url), None)
+    if not found:
         raise HTTPException(status_code=404, detail="That PDF isn't in this vendor's site review. Review the site again.")
 
     body = fetch_site_pdf(vendor["link"], request.url)
@@ -5467,11 +5469,15 @@ def add_site_pdf(vendor_id: str, request: SitePdfAdd):
                 os.fchmod(out.fileno(), 0o600)
                 out.write(body)
             filename = site_pdf_name(request.url)
+            # Site builders often store files under generated names, so the
+            # link's own text ("Wedding Menus") makes the better title.
+            label = " ".join((found.get("label") or "").split())
+            title = label[:200] if len(label) >= 3 and not SITE_PDF_GENERIC_LABEL.match(label) else filename
             conn.execute(
                 """INSERT INTO documents (id, title, doc_type, filename, mime_type, size_bytes, sha256,
                    related_type, related_id, budget_item_id, notes, date_added, extraction_status)
                    VALUES (?, ?, ?, ?, 'application/pdf', ?, ?, 'vendor', ?, NULL, ?, ?, 'queued')""",
-                (doc_id, filename, PRICE_SHEET_DOC_TYPE, filename, len(body), digest, vendor_id,
+                (doc_id, title, PRICE_SHEET_DOC_TYPE, filename, len(body), digest, vendor_id,
                  f"From their website: {request.url}"[:500], int(time.time() * 1000)),
             )
             os.replace(tmp_path, DOCUMENTS_DIR / doc_id)
