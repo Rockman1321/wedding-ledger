@@ -2923,6 +2923,7 @@
     return html + priceFoundHtml(d) + picker +
       '<div class="bud-ledger-buttons">' +
         (count ? '<button type="button" class="btn-small" style="color:var(--accent)" data-price-action="apply" data-id="' + d.id + '">Add ticked prices</button>' : '') +
+        '<button type="button" class="btn-small" style="color:var(--text-dim)" data-price-action="reread" data-id="' + d.id + '">Read again</button>' +
         buttons +
       '</div></div>';
   }
