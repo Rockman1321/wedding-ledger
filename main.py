@@ -4833,6 +4833,7 @@ SITE_REVIEW_UA = "WeddingHubSiteReview/1.0 (personal wedding planning, run by th
 SITE_MAX_PAGES = 8
 SITE_MODEL_PAGES = 5
 SITE_MAX_BYTES = 5 * 1024 * 1024
+SITE_PDF_MAX_BYTES = MAX_DOCUMENT_BYTES
 SITE_MAX_DELAY_SECONDS = 15
 SITE_MIN_PAGE_CHARS = 200
 SITE_MODEL_CHARS = 9000
@@ -4942,12 +4943,18 @@ def fetch_site_url(client: httpx.Client, url: str, home_site: str, max_bytes: in
             if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("location"):
                 url = urljoin(url, response.headers["location"])
                 continue
-            body = b""
+            content_type = response.headers.get("content-type", "")
+            # Menus are often photo-heavy PDFs well past a web page's size, so a
+            # PDF may be as big as an uploaded document before it's cut off.
+            limit = max_bytes
+            if "pdf" in content_type.lower() or parts.path.lower().endswith(".pdf"):
+                limit = max(max_bytes, SITE_PDF_MAX_BYTES)
+            body = bytearray()
             for chunk in response.iter_bytes():
                 body += chunk
-                if len(body) > max_bytes:
+                if len(body) > limit:
                     break
-            return response.status_code, response.headers.get("content-type", ""), body, url
+            return response.status_code, content_type, bytes(body), url
     raise SiteRefused("too many redirects")
 
 
