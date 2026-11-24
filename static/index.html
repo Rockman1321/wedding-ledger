@@ -2883,21 +2883,26 @@
   function priceFoundHtml(d) {
     var lines = d.extraction.lines;
     var perPersonByOption = {};
+    // Older reads have no "included": everything was counted then.
+    var counted = function (l) { return l.included !== false; };
     lines.forEach(function (l) {
-      if (l.basis === 'per_person') perPersonByOption[l.option || 'Every option'] = (perPersonByOption[l.option || 'Every option'] || 0) + 1;
+      if (l.basis === 'per_person' && counted(l)) perPersonByOption[l.option || 'Every option'] = (perPersonByOption[l.option || 'Every option'] || 0) + 1;
     });
     var choices = Object.keys(perPersonByOption).filter(function (k) { return perPersonByOption[k] > 1; });
     return d.extraction.warnings.map(function (w) { return '<div class="bud-warning">' + escapeHtml(w) + '</div>'; }).join('') +
       (lines.length ? '<div class="bud-warning">Found by your local AI, so check each price against the file. Percentages for service charges and tax are found by text search.</div>' : '') +
       (choices.length ? siteNote(choices.map(escapeHtml).join(', ') + ' ha' + (choices.length === 1 ? 's' : 've') + ' more than one per-person price. If some are a choice of entrée rather than add-ons, untick all but one after adding them.') : '') +
-      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Min.</th></tr>' +
+      (lines.some(function (l) { return !counted(l); }) ? siteNote('Extras, upgrades and charges that only apply sometimes are added but not counted in the totals. Tick "Count" on any you want after adding them.') : '') +
+      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Min.</th><th>Totals</th></tr>' +
         lines.map(function (l, i) {
           return '<tr><td><input type="checkbox" class="pr-pick" data-idx="' + i + '" checked aria-label="Add this price"></td>' +
             '<td>' + escapeHtml(l.option || 'Every option') + '</td>' +
-            '<td>' + escapeHtml(l.item) + (l.quote ? '<div class="pr-quote">"' + escapeHtml(l.quote) + '"</div>' : '') + '</td>' +
+            '<td>' + escapeHtml(l.item) + (l.note ? '<div class="pr-quote" style="font-style:normal">' + escapeHtml(l.note) + '</div>' : '') +
+              (l.quote ? '<div class="pr-quote">"' + escapeHtml(l.quote) + '"</div>' : '') + '</td>' +
             '<td>' + escapeHtml(PRICE_BASIS_LABEL[l.basis] || l.basis) + '</td>' +
             '<td class="num">' + priceValueText(l.basis, l.price) + '</td>' +
-            '<td class="num">' + (l.quantity == null ? '' : l.quantity) + '</td></tr>';
+            '<td class="num">' + (l.quantity == null ? '' : l.quantity) + '</td>' +
+            '<td>' + (counted(l) ? 'Counted' : '<span style="color:var(--text-dim)">Not counted</span>') + '</td></tr>';
         }).join('') + '</table></div>' : '');
   }
   // One uploaded price sheet: still reading, failed, or waiting for review.
@@ -2942,7 +2947,7 @@
       '<div class="wa-form-error" data-price-msg="' + v.id + '"></div>' +
       sitePdfsHtml(v, true) +
       docs.map(priceDocHtml).join('') +
-      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th></th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Qty / min.</th><th class="num">Amount</th><th></th></tr>' +
+      (lines.length ? '<div style="overflow-x:auto;"><table class="pr-table"><tr><th title="Count this line in the totals">Count</th><th>Option</th><th>Item</th><th>Priced</th><th class="num">Price</th><th class="num">Qty / min.</th><th class="num">Amount</th><th></th></tr>' +
         lines.map(function (l) { return priceLineRowHtml(l, lines, counts); }).join('') + '</table></div>'
         : (docs.length ? '' : siteNote('No prices yet.'))) +
       '<datalist id="prOptions-' + v.id + '">' + optionNames.map(function (o) { return '<option value="' + budAttr(o) + '">'; }).join('') + '</datalist>' +
@@ -3031,7 +3036,7 @@
     fetch('/api/documents/' + doc.id + '/price-lines/apply', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ vendorId: vendorId, lines: picked.map(function (l) {
-        return { optionName: l.option, item: l.item, basis: l.basis, price: l.price, quantity: l.quantity, included: true, quote: l.quote || '' };
+        return { optionName: l.option, item: l.item, basis: l.basis, price: l.price, quantity: l.quantity, included: l.included !== false, quote: l.quote || '' };
       }) })
     }).then(function (res) {
       return res.json().then(function (data) {

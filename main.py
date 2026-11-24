@@ -3107,7 +3107,8 @@ def document_text(path: Path, mime_type: str) -> tuple:
         reader = pypdf.PdfReader(path)
         if reader.is_encrypted:
             return "", "This PDF is password protected."
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        # A form feed marks each page break: price sheets read page by page.
+        text = "\n\f\n".join(page.extract_text() or "" for page in reader.pages)
         if len(text.strip()) < DOC_MIN_TEXT_CHARS:
             return "", "This looks like a scanned PDF with no readable text."
         return text, None
@@ -3167,6 +3168,8 @@ For each one give:
 - basis: "per_person" for a price per guest, "per_child" for a child's price, "each" for a price per item, hour or staff member, "flat" for one fixed price, "percent" for a percentage like a service charge or tax.
 - price: the number only, without $ or %.
 - minimum: the minimum number of guests that price requires, or null.
+The text is split into pages. A page's title can be at its start or at its end, so read the whole page before deciding which option its prices belong to.
+Leave out payment terms, which aren't prices: retainers and deposits, cancellation charges, refunds and credit card fees.
 If there are no prices, return an empty list."""
 PRICE_SCHEMA = {
     "type": "object",
@@ -3183,26 +3186,116 @@ PRICE_SCHEMA = {
 }
 
 
-def price_quote(flat: str, price: float, basis: str, item: str) -> str:
-    """Where in the document a price came from, for the review: the place the
-    number appears that sits closest to the item's own words."""
+# Service styles, for telling which option a price belongs to by the page it's
+# on. Menu PDFs often put a page's title in a graphic that the text comes out
+# after the prices, so the page's wording is surer than its nearest heading.
+PRICE_STYLES = [
+    ("Plated", re.compile(r"\bplated\b", re.I)),
+    ("Family style", re.compile(r"\bfamily[ -]style\b", re.I)),
+    ("Buffet", re.compile(r"\bbuffet", re.I)),
+    ("Stations", re.compile(r"\bstations?\b", re.I)),
+    ("Drop-off", re.compile(r"\bdrop[ -]?off\b", re.I)),
+]
+# Read from the price's own line: money terms that aren't a cost of the day.
+PRICE_PAYMENT_TERMS = re.compile(
+    r"cancel|refund|retainer|deposit|reserve the date|hold the date|convenience fee|credit card|card fee|late (?:fee|payment)", re.I)
+# Read from the price's line and the one before: extras and charges that only
+# apply in some cases. They're kept, but not counted until ticked.
+PRICE_SOMETIMES = re.compile(
+    r"\b(?:if|should|unless|whether|holidays?|outside|upon request|on request|optional|additional|extra|add-?ons?|upgrades?|travel|overtime)\b|tasting", re.I)
+PRICE_PAGE_MINIMUM = re.compile(r"(\d{2,4})\s*guests?\s*minimum|minimum\s*(?:of\s*)?(\d{2,4})\s*guests", re.I)
+# Item names that only say "a price", so the price's own line names it better.
+PRICE_GENERIC_ITEM = {"price", "per", "guest", "guests", "person", "cost", "rate", "pricing", "the", "a"}
+PRICE_TAX_MENTION = re.compile(r"\b(?:sales tax|plus tax|\+\s*tax|tax (?:is |will be )?(?:added|applies|extra))\b", re.I)
+
+
+def price_page_style(page: str) -> str:
+    """The service style a page is about, when one clearly outnumbers the rest."""
+    counts = sorted(((len(rx.findall(page)), name) for name, rx in PRICE_STYLES), reverse=True)
+    (top, name), (second, _) = counts[0], counts[1]
+    return name if top >= 2 and top >= 2 * second else ""
+
+
+def price_locate(pages: List[List[str]], price: float, basis: str, item: str) -> Optional[tuple]:
+    """(page, line, where on the line) a price appears, choosing the place whose line, or the
+    one before it, shares most words with the item. A $ sign breaks ties."""
     whole = float(price).is_integer()
     variants = {f"{price:,.2f}", f"{price:.2f}"} | ({f"{price:,.0f}", f"{price:.0f}"} if whole else set())
     if basis == "percent":
         variants |= {f"{price:g}"}
-        pattern = r"(?<![\d.,])(?:" + "|".join(re.escape(v) for v in variants) + r")\s*%"
+        pattern = re.compile(r"(?<![\d.,])(?:" + "|".join(re.escape(v) for v in variants) + r")\s*%")
     else:
-        pattern = r"\$\s?(?:" + "|".join(re.escape(v) for v in variants) + r")(?![\d,]|\.\d)"
-    words = [w for w in re.findall(r"[a-z]{4,}", item.lower())]
-    best, best_score = "", -1
-    for match in re.finditer(pattern, flat):
-        start = flat.rfind(" ", 0, max(match.start() - 60, 0)) + 1
-        end = flat.find(" ", min(match.end() + 30, len(flat)))
-        window = flat[start:end if end > 0 else len(flat)]
-        score = sum(1 for w in words if w in window.lower())
-        if score > best_score:
-            best, best_score = window, score
+        pattern = re.compile(r"(?<![\d.,])(\$\s?)?(?:" + "|".join(re.escape(v) for v in variants) + r")(?![\d,]|\.\d)")
+    words = re.findall(r"[a-z]{4,}", item.lower())
+    best, best_score = None, -1
+    for page_no, lines in enumerate(pages):
+        for line_no, line in enumerate(lines):
+            match = pattern.search(line)
+            if not match:
+                continue
+            around = ((lines[line_no - 1] + " ") if line_no else "") + line
+            score = 2 * sum(1 for w in words if w in around.lower()) + (basis == "percent" or bool(match.group(1)))
+            if score > best_score:
+                best, best_score = (page_no, line_no, match.start()), score
     return best
+
+
+def price_place_lines(lines: List[dict], text: str, warnings: List[str]) -> List[dict]:
+    """Code's own read of where each price sits: the quote, the option from its
+    page when the model gave none or a style that page isn't about, payment
+    terms left out, and extras or sometimes-charges not counted."""
+    pages = [page.split("\n") for page in text.split("\f")]
+    styles = [price_page_style("\n".join(page)) for page in pages]
+    style_names = {name.lower() for name, _ in PRICE_STYLES}
+    kept, terms = [], []
+    for line in lines:
+        place = price_locate(pages, line["price"], line["basis"], line["item"])
+        line["quote"], line["included"], line["note"] = "", True, ""
+        if not place:
+            kept.append(line)
+            continue
+        page_no, line_no, at = place
+        page = pages[page_no]
+        own = page[line_no]
+        before = page[line_no - 1] if line_no else ""
+        line["quote"] = normalize_doc_text(" ".join(page[max(line_no - 1, 0):line_no + 2]))[:240]
+        if PRICE_PAYMENT_TERMS.search(own):
+            terms.append(priced_text(line))
+            continue
+        style = styles[page_no]
+        given = line["option"].lower()
+        if style and line["basis"] != "percent" and (not given or (given in style_names and given != style.lower())):
+            line["option"] = style
+        label = own[:at].strip(" -–:.\t$")
+        if (set(re.findall(r"[a-z]+", line["item"].lower())) <= PRICE_GENERIC_ITEM
+                and 3 <= len(label) <= 60 and not re.search(r"\d", label)
+                and not set(re.findall(r"[a-z]+", label.lower())) <= PRICE_GENERIC_ITEM):
+            line["item"] = label
+        if PRICE_SOMETIMES.search(before + " " + own):
+            line["included"] = False
+            line["note"] = "Tasting: not part of the day's total" if re.search(r"tasting", own, re.I) else "Extra, or only in some cases"
+        # "50 guests minimum" under a page's prices holds for its base prices.
+        minimums = {int(a or b) for a, b in PRICE_PAGE_MINIMUM.findall("\n".join(page))}
+        if line["basis"] == "per_person" and line["included"] and line["quantity"] is None and len(minimums) == 1:
+            line["quantity"] = minimums.pop()
+        kept.append(line)
+    # One base price per option: a second per-person price is usually another
+    # choice (a surf and turf upgrade), so it waits to be ticked.
+    based = set()
+    for line in kept:
+        if line["basis"] != "per_person" or not line["included"]:
+            continue
+        if line["option"].lower() in based:
+            line["included"] = False
+            line["note"] = "Another per-person price for this option. Tick it if it's the one you'd pick, or it's added on top"
+        based.add(line["option"].lower())
+    if terms:
+        warnings.append(f"Left out payment terms, like retainers, cancellation charges and card fees: {', '.join(terms)}.")
+    return kept
+
+
+def priced_text(line: dict) -> str:
+    return f"{line['price']:g}%" if line["basis"] == "percent" else f"${line['price']:,.2f}".replace(".00", "")
 
 
 def read_price_percentages(text: str) -> List[dict]:
@@ -3249,10 +3342,34 @@ def verify_price_lines(model_lines: List[dict], text: str, warnings: List[str]) 
     return clean
 
 
+def price_chunks(text: str) -> List[str]:
+    """Whole pages, labelled, packed into chunks, so the model sees each page's
+    prices together with its title wherever on the page the title came out."""
+    chunks, current = [], ""
+    for number, page in enumerate(text.split("\f"), start=1):
+        page = page.strip()
+        if not page:
+            continue
+        labelled = f"--- Page {number} ---\n{page}\n"
+        if len(labelled) > DOC_CHUNK_CHARS:
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks += [f"--- Page {number} ---\n{part}" for part in split_document_text(page)]
+        elif len(current) + len(labelled) > DOC_CHUNK_CHARS:
+            chunks.append(current)
+            current = labelled
+        else:
+            current += labelled
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def build_price_extraction(text: str) -> dict:
     warnings: List[str] = []
     code_lines = read_price_percentages(text)
-    chunks = split_document_text(text)
+    chunks = price_chunks(text)
     if len(chunks) > DOC_MAX_CHUNKS:
         warnings.append("This is a long document, so only the first part was read. Add any missing prices by hand.")
         chunks = chunks[:DOC_MAX_CHUNKS]
@@ -3282,9 +3399,9 @@ def build_price_extraction(text: str) -> dict:
     if len(lines) > PRICE_MAX_LINES:
         warnings.append(f"Only the first {PRICE_MAX_LINES} prices were kept.")
         lines = lines[:PRICE_MAX_LINES]
-    flat = normalize_doc_text(text)
-    for line in lines:
-        line["quote"] = price_quote(flat, line["price"], line["basis"], line["item"])
+    lines = price_place_lines(lines, text, warnings)
+    if PRICE_TAX_MENTION.search(text) and not any(l["basis"] == "percent" and "tax" in l["item"].lower() for l in lines):
+        warnings.append("The document mentions sales tax but gives no rate. Add a Sales tax line with your local rate.")
     if re.search(r"\d\s?\+\+", text):
         warnings.append('Prices marked "++" have a service charge and tax added on top. Check those percentages are in the list.')
     if not lines:
